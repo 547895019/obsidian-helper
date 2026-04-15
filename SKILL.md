@@ -16,6 +16,28 @@ metadata:
 
 A command-line tool for operating Obsidian vaults. Works with vaults stored on Windows (WSL) or Linux.
 
+## Installation
+
+### Quick Install (Recommended)
+
+Run the install script:
+```bash
+cd ~/skills/obsidian-helper
+bash scripts/install.sh
+```
+
+This will:
+- Copy `obsidian` script to `~/bin/`
+- Make it executable
+- Add `~/bin` to your PATH (if not already present)
+
+### Verify Installation
+
+```bash
+which obsidian
+obsidian --version  # or obsidian help
+```
+
 ## Quick Start
 
 ```bash
@@ -47,6 +69,13 @@ The script auto-detects the vault path:
    ~/obsidian
    ```
 
+4. **Set your Obsidian vault path** (optional - auto-detects if not set):
+   ```bash
+   # Add to ~/.bashrc
+   echo 'export OBSIDIAN_VAULT=/mnt/c/Users/YourName/Documents/Obsidian/Vault' >> ~/.bashrc
+   source ~/.bashrc
+   ```
+   
 ## Commands Reference
 
 | Command | Aliases | Description |
@@ -85,52 +114,3 @@ obsidian daily
 ## Daily Notes
 
 Daily notes are stored in `Daily/YYYY/YYYY-MM-DD.md` format.
-
-## Installation
-
-### Quick Install (Recommended)
-
-Run the install script:
-```bash
-cd ~/skills/obsidian-helper
-bash scripts/install.sh
-```
-
-This will:
-- Copy `obsidian` script to `~/bin/`
-- Make it executable
-- Add `~/bin` to your PATH (if not already present)
-
-### Manual Install
-
-```bash
-mkdir -p ~/bin
-cp scripts/obsidian ~/bin/obsidian
-chmod +x ~/bin/obsidian
-
-# Add to PATH
-echo 'export PATH="$HOME/bin:$PATH"' >> ~/.bashrc
-source ~/.bashrc
-```
-
-### Verify Installation
-
-```bash
-which obsidian
-obsidian --version  # or obsidian help
-```
-
-### Post-Installation Setup
-
-1. **Set your Obsidian vault path** (optional - auto-detects if not set):
-   ```bash
-   # Add to ~/.bashrc
-   echo 'export OBSIDIAN_VAULT=/mnt/c/Users/YourName/Documents/Obsidian/Vault' >> ~/.bashrc
-   source ~/.bashrc
-   ```
-
-2. **Start using**:
-   ```bash
-   obsidian list    # List all notes
-   obsidian daily   # Create today's daily note
-   ```
