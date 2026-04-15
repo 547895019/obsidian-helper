@@ -1,0 +1,258 @@
+#!/bin/bash
+# obsidian - Obsidian Vault 操作助手
+# 用法: obsidian <命令> [参数]
+
+# Vault 路径 (可配置)
+# 优先使用环境变量 OBSIDIAN_VAULT
+# 否则自动检测 Windows 用户名
+if [ -n "$OBSIDIAN_VAULT" ]; then
+    VAULT_PATH="$OBSIDIAN_VAULT"
+elif [ -d "/mnt/c/Users" ]; then
+    # WSL 环境：自动检测 Windows 用户目录
+    WINDOWS_USER=$(ls /mnt/c/Users/ 2>/dev/null | grep -v "All Users\|Default\|Public\|TEMP" | head -1)
+    VAULT_PATH="/mnt/c/Users/$WINDOWS_USER/Documents/Obsidian"
+else
+    # Linux 环境：使用默认路径
+    VAULT_PATH="$HOME/obsidian"
+fi
+
+# 列出所有笔记
+obsidian_list() {
+    echo "=== Obsidian Vault 笔记列表 ==="
+    echo ""
+    find "$VAULT_PATH" -name "*.md" -type f 2>/dev/null | sort | while read f; do
+        local rel_path="${f#$VAULT_PATH/}"
+        local lines=$(wc -l < "$f" 2>/dev/null || echo "0")
+        printf "  📄 %-40s %4d 行\n" "$rel_path" "$lines"
+    done
+    echo ""
+    local total=$(find "$VAULT_PATH" -name "*.md" -type f 2>/dev/null | wc -l)
+    echo "  共 $total 个笔记"
+}
+
+# 搜索笔记内容
+obsidian_search() {
+    local query="$1"
+    if [ -z "$query" ]; then
+        echo "错误: 请提供搜索关键词"
+        return 1
+    fi
+    echo "=== 搜索: \"$query\" ==="
+    echo ""
+    grep -rn "$query" "$VAULT_PATH" --include="*.md" 2>/dev/null | while read line; do
+        local file=$(echo "$line" | cut -d: -f1)
+        local num=$(echo "$line" | cut -d: -f2)
+        local content=$(echo "$line" | cut -d: -f3- | head -c 60)
+        local rel_path="${file#$VAULT_PATH/}"
+        printf "  📄 %-30s:%-4s %s...\n" "$rel_path" "$num" "$content"
+    done
+}
+
+# 创建新笔记
+obsidian_create() {
+    local filename="$1"
+    local content="$2"
+    
+    if [ -z "$filename" ]; then
+        echo "错误: 请提供文件名"
+        return 1
+    fi
+    
+    # 确保 .md 后缀
+    [[ ! "$filename" == *.md ]] && filename="$filename.md"
+    
+    local filepath="$VAULT_PATH/$filename"
+    
+    # 创建目录（如果需要）
+    mkdir -p "$(dirname "$filepath")"
+    
+    if [ -f "$filepath" ]; then
+        echo "警告: 文件已存在，追加内容"
+    fi
+    
+    if [ -z "$content" ]; then
+        content="# ${filename%.md}\n\n创建时间: $(date '+%Y-%m-%d %H:%M')\n\n"
+    fi
+    
+    echo -e "$content" >> "$filepath"
+    echo "✅ 创建: $filename"
+}
+
+# 读取笔记内容
+obsidian_read() {
+    local filename="$1"
+    
+    if [ -z "$filename" ]; then
+        echo "错误: 请提供文件名"
+        return 1
+    fi
+    
+    [[ ! "$filename" == *.md ]] && filename="$filename.md"
+    local filepath="$VAULT_PATH/$filename"
+    
+    if [ ! -f "$filepath" ]; then
+        # 尝试搜索
+        local found=$(find "$VAULT_PATH" -name "*$filename*" -type f 2>/dev/null | head -1)
+        if [ -n "$found" ]; then
+            filepath="$found"
+            echo "找到: ${filepath#$VAULT_PATH/}"
+        else
+            echo "❌ 文件不存在: $filename"
+            return 1
+        fi
+    fi
+    
+    echo "=== $filename ==="
+    echo ""
+    cat "$filepath"
+}
+
+# 编辑笔记 (用 $EDITOR 或 vim)
+obsidian_edit() {
+    local filename="$1"
+    
+    if [ -z "$filename" ]; then
+        echo "错误: 请提供文件名"
+        return 1
+    fi
+    
+    [[ ! "$filename" == *.md ]] && filename="$filename.md"
+    local filepath="$VAULT_PATH/$filename"
+    
+    if [ ! -f "$filepath" ]; then
+        echo "文件不存在，将创建新文件"
+    fi
+    
+    mkdir -p "$(dirname "$filepath")"
+    ${EDITOR:-vim} "$filepath"
+}
+
+# 创建/查看日报
+obsidian_daily() {
+    local date="${1:-$(date +%Y-%m-%d)}"
+    local year=$(echo $date | cut -d- -f1)
+    local filepath="Daily/$year/$date.md"
+    
+    mkdir -p "$VAULT_PATH/Daily/$year"
+    
+    if [ ! -f "$VAULT_PATH/$filepath" ]; then
+        cat > "$VAULT_PATH/$filepath" << EOF
+# $date
+
+## 📋 今日待办
+- [ ] 
+
+## 📝 笔记
+
+
+## 💭 想法
+
+EOF
+        echo "✅ 创建日报: $filepath"
+    else
+        echo "📄 日报已存在"
+    fi
+    
+    echo ""
+    cat "$VAULT_PATH/$filepath"
+}
+
+# 删除笔记
+obsidian_delete() {
+    local filename="$1"
+    
+    if [ -z "$filename" ]; then
+        echo "错误: 请提供文件名"
+        return 1
+    fi
+    
+    [[ ! "$filename" == *.md ]] && filename="$filename.md"
+    local filepath="$VAULT_PATH/$filename"
+    
+    if [ ! -f "$filepath" ]; then
+        echo "❌ 文件不存在: $filename"
+        return 1
+    fi
+    
+    echo "确定要删除 $filename 吗? (y/N)"
+    read -r confirm
+    if [ "$confirm" = "y" ] || [ "$confirm" = "Y" ]; then
+        rm "$filepath"
+        echo "✅ 已删除: $filename"
+    else
+        echo "取消删除"
+    fi
+}
+
+# 显示帮助
+show_help() {
+    cat << EOF
+Obsidian Vault 操作助手
+
+用法:
+  obsidian <命令> [参数]
+
+命令:
+  list, ls              列出所有笔记
+  search <关键词>        搜索笔记内容
+  create <文件名> [内容]  创建新笔记
+  read <文件名>          读取笔记内容
+  edit <文件名>          编辑笔记 (用 vim)
+  daily [日期]           创建/查看日报 (默认今天)
+  delete <文件名>        删除笔记
+  help                   显示此帮助
+
+示例:
+  obsidian list
+  obsidian search "关键词"
+  obsidian create "项目/笔记名" "# 标题"
+  obsidian read "欢迎"
+  obsidian daily
+  obsidian delete "旧笔记"
+
+环境变量:
+  OBSIDIAN_VAULT  设置 vault 路径
+  
+  WSL 环境会自动检测 Windows 用户目录。
+  Linux 环境默认使用 ~/obsidian。
+
+当前 Vault:
+  $VAULT_PATH
+EOF
+}
+
+# 主函数
+case "$1" in
+    list|ls|l)
+        obsidian_list
+        ;;
+    search|s|find)
+        obsidian_search "$2"
+        ;;
+    create|c|new)
+        obsidian_create "$2" "$3"
+        ;;
+    read|r|cat|show)
+        obsidian_read "$2"
+        ;;
+    edit|e|vim)
+        obsidian_edit "$2"
+        ;;
+    daily|d|today)
+        obsidian_daily "$2"
+        ;;
+    delete|del|rm)
+        obsidian_delete "$2"
+        ;;
+    help|h|--help|-h)
+        show_help
+        ;;
+    *)
+        if [ -z "$1" ]; then
+            show_help
+        else
+            echo "未知命令: $1"
+            echo "运行 'obsidian help' 查看可用命令"
+        fi
+        ;;
+esac
